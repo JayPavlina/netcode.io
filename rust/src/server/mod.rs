@@ -10,7 +10,7 @@ use crate::packet;
 use crate::token;
 use crate::crypto;
 
-mod connection;
+pub mod connection;
 use crate::server::connection::*;
 use crate::socket::*;
 use crate::error::*;
@@ -100,11 +100,11 @@ type ClientVec = Vec<Option<Connection>>;
 pub struct Server<I,S> {
     //@todo: We could probably use a free list or something smarter here if
     //we find that performance is an issue.
-    clients: ClientVec,
-    internal: ServerInternal<I,S>
+    pub clients: ClientVec,
+    pub internal: ServerInternal<I,S>
 }
 
-struct ServerInternal<I,S> {
+pub struct ServerInternal<I,S> {
     #[allow(dead_code)]
     socket_state: S,
 
@@ -322,7 +322,7 @@ impl<I,S> Server<I,S> where I: SocketProvider<I,S> {
         result.unwrap_or_else(|| self.internal.handle_new_client(addr, data, payload, &mut self.clients))
     }
 
-    fn find_client_by_id(clients: &mut ClientVec, id: ClientId) -> Option<&mut Connection> {
+    pub fn find_client_by_id(clients: &mut ClientVec, id: ClientId) -> Option<&mut Connection> {
         clients.iter_mut().map(|c| c.as_mut()).find(|c| {
                 if let Some(ref c) = c {
                     c.client_id == id
@@ -415,7 +415,7 @@ impl<I,S> ServerInternal<I,S> where I: SocketProvider<I,S> {
         Ok(())
     }
 
-    fn send_packet(&mut self, client: &mut Connection, packet: &packet::Packet, payload: Option<&[u8]>) -> Result<usize, SendError> {
+    pub fn send_packet(&mut self, client: &mut Connection, packet: &packet::Packet, payload: Option<&[u8]>) -> Result<usize, SendError> {
         client.channel.send(self.time, packet, payload, &mut self.listen_socket)
     }
 
