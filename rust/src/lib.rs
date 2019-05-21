@@ -173,3 +173,4 @@ pub use crate::server::{UdpServer, Server, ServerEvent};
 pub use crate::client::{UdpClient, Client, ClientEvent, State as ClientState};
 pub use crate::crypto::{generate_key};
 pub use crate::error::*;
+pub use crate::packet::Packet;
