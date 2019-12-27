@@ -11,11 +11,15 @@ static mut SODIUM_INIT: atomic::AtomicUsize = atomic::ATOMIC_USIZE_INIT;
 
 pub const NETCODE_ENCRYPT_EXTA_BYTES: usize = libsodium_sys::crypto_aead_chacha20poly1305_ABYTES;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum EncryptError {
+    #[error(display = "InvalidPublicKeySize")]
     InvalidPublicKeySize,
+    #[error(display = "BufferSizeMismatch")]
     BufferSizeMismatch,
+    #[error(display = "{}", _0)]
     IO(io::Error),
+    #[error(display = "Failed")]
     Failed
 }
 

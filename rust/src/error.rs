@@ -26,19 +26,24 @@ pub enum InternalError {
 }
 
 /// Errors from sending packets
-#[derive(Debug)]
+#[derive(Debug, Error)]
 // TODO: fix me
 #[cfg_attr(feature="cargo-clippy", allow(stutter))]
 pub enum SendError {
     /// Client Id used for sending didn't exist.
+    #[error(display = "Client Id used for sending didn't exist")]
     InvalidClientId,
     /// Failed to encode the packet for sending.
-    PacketEncodeError(packet::PacketError),
+    #[error(display = "Failed to encode the packet for sending")]
+    PacketEncodeError(#[error(source)] packet::PacketError),
     /// Packet is larger than [PACKET_MAX_PAYLOAD_SIZE](constant.NETCODE_MAX_PAYLOAD_SIZE.html) or equals zero.
+    #[error(display = "Packet is larger than PACKET_MAX_PAYLOAD_SIZE or equals zero")]
     PacketSize,
     /// Generic io error.
-    SocketError(io::Error),
+    #[error(display = "{}", _0)]
+    SocketError(#[error(source)] io::Error),
     /// Client/Server is disconnected and cannot send packets
+    #[error(display = "Client/Server is disconnected and cannot send packets")]
     Disconnected
 }
 
@@ -76,18 +81,6 @@ impl From<packet::ChallengeEncodeError> for UpdateError {
 impl From<SendError> for UpdateError {
     fn from(err: SendError) -> Self {
         UpdateError::SendError(err)
-    }
-}
-
-impl From<packet::PacketError> for SendError {
-    fn from(err: packet::PacketError) -> Self {
-        SendError::PacketEncodeError(err)
-    }
-}
-
-impl From<io::Error> for SendError {
-    fn from(err: io::Error) -> Self {
-        SendError::SocketError(err)
     }
 }
 

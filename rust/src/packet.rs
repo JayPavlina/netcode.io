@@ -76,27 +76,20 @@ fn sequence_bytes_required(sequence: u64) -> usize
     0
 }
 
-#[derive(Debug)]
 // TODO: fix me
 #[cfg_attr(feature="cargo-clippy", allow(stutter))]
+#[derive(Debug, Error)]
 pub enum PacketError {
+    #[error(display = "InvalidPrivateKey")]
     InvalidPrivateKey,
+    #[error(display = "InvalidPacket")]
     InvalidPacket,
-    DecryptError(crypto::EncryptError),
-    GenericIO(io::Error)
+    #[error(display = "{}", _0)]
+    DecryptError(#[error(source)] crypto::EncryptError),
+    #[error(display = "{}", _0)]
+    GenericIO(#[error(source)] io::Error)
 }
 
-impl From<io::Error> for PacketError {
-    fn from(err: io::Error) -> Self {
-        PacketError::GenericIO(err)
-    }
-}
-
-impl From<crypto::EncryptError> for PacketError {
-    fn from(err: crypto::EncryptError) -> Self {
-        PacketError::DecryptError(err)
-    }
-}
 
 fn write_sequence<W>(out: &mut W, seq: u64) -> Result<usize, io::Error> where W: io::Write {
     let len = sequence_bytes_required(seq);
