@@ -172,7 +172,7 @@ mod socket;
 
 pub use crate::token::{ConnectToken, DecodeError};
 pub use crate::common::{NETCODE_MAX_PACKET_SIZE, NETCODE_MAX_PAYLOAD_SIZE, NETCODE_USER_DATA_BYTES};
-pub use crate::server::{UdpServer, Server, ServerEvent};
+pub use crate::server::{UdpServer, Server, ServerEvent, CreateError};
 pub use crate::server::connection::Connection;
 pub use crate::client::{UdpClient, Client, ClientEvent, State as ClientState};
 pub use crate::crypto::{generate_key};
