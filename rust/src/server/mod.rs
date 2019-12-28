@@ -17,20 +17,17 @@ use crate::error::*;
 use crate::channel::{self, Channel};
 
 /// Errors from creating a server.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum CreateError {
     /// Address is already in use.
+    #[error(display = "Address is already in use")]
     AddrInUse,
     /// Address is not available(and probably already bound).
+    #[error(display = "Address is not available(and probably already bound)")]
     AddrNotAvailable,
     /// Generic(other) io error occurred.
-    GenericIo(io::Error)
-}
-
-impl From<io::Error> for CreateError {
-    fn from(err: io::Error) -> Self {
-        CreateError::GenericIo(err)
-    }
+    #[error(display = "{}", _0)]
+    GenericIo(#[error(source)] io::Error)
 }
 
 pub type ClientId = u64;
