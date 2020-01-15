@@ -7,13 +7,16 @@ use byteorder::{WriteBytesExt, ReadBytesExt, LittleEndian, BigEndian};
 use crate::common::*;
 use crate::crypto;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum GenerateError {
     /// Too many connect addresses encoded.
+    #[error(display = "Too many connect addresses encoded")]
     MaxHostCount,
     /// IO error occured when writing token.
+    #[error(display = "IO error occured when writing token: {}", _0)]
     GenericIO(io::Error),
     /// Encryption of private data failed.
+    #[error(display = "Encryption of private data failed: {}", _0)]
     Encrypt(crypto::EncryptError)
 }
 

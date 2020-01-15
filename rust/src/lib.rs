@@ -170,7 +170,7 @@ mod token;
 mod packet;
 mod socket;
 
-pub use crate::token::{ConnectToken, HostList, DecodeError};
+pub use crate::token::{ConnectToken, HostList, DecodeError, GenerateError};
 pub use crate::common::{NETCODE_MAX_PACKET_SIZE, NETCODE_MAX_PAYLOAD_SIZE, NETCODE_USER_DATA_BYTES};
 pub use crate::server::{UdpServer, Server, ServerEvent, CreateError as CreateServerError};
 pub use crate::server::connection::Connection;
