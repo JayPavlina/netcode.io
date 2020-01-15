@@ -29,28 +29,20 @@ impl From<crypto::EncryptError> for GenerateError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum DecodeError {
     /// Private key failed to decode auth data.
+    #[error(display = "Private key failed to decode auth data")]
     InvalidPrivateKey,
     /// Invalid version number was supplied.
+    #[error(display = "Invalid version number was supplied.")]
     InvalidVersion,
     /// IO error occured when reading token.
-    GenericIO(io::Error),
+    #[error(display = "IO error occured when reading token: {}", _0)]
+    GenericIO(#[error(source)] io::Error),
     /// Decryption of private data failed.
-    Decrypt(crypto::EncryptError)
-}
-
-impl From<io::Error> for DecodeError {
-    fn from(err: io::Error) -> Self {
-        DecodeError::GenericIO(err)
-    }
-}
-
-impl From<crypto::EncryptError> for DecodeError {
-    fn from(err: crypto::EncryptError) -> Self {
-        DecodeError::Decrypt(err)
-    }
+    #[error(display = "Decryption of private data failed: {}", _0)]
+    Decrypt(#[error(source)] crypto::EncryptError)
 }
 
 const NETCODE_ADDRESS_NONE: u8 = 0;
