@@ -1,5 +1,3 @@
-cargo-features = ["edition"]
-
 [package]
 name = "netcode"
 version = "0.3.1"
@@ -17,11 +15,12 @@ exclude = [
 ]
 
 [dependencies]
-libsodium-sys = { git = "https://github.com/vvanders/sodiumoxide.git" }
+libsodium-sys = "0.2.5"
 log = "0.3.6"
 byteorder = "1.0.0"
 env_logger = "0.4.2"
 time = "0.1.36"
+libc = "0.2.0"
 err-derive = "0.2.1"
 
 [dev-dependencies]

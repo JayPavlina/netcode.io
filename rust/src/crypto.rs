@@ -9,7 +9,7 @@ use byteorder::{WriteBytesExt, LittleEndian};
 #[cfg_attr(feature="cargo-clippy", allow(replace_consts))]
 static mut SODIUM_INIT: atomic::AtomicUsize = atomic::AtomicUsize::new(0);
 
-pub const NETCODE_ENCRYPT_EXTA_BYTES: usize = libsodium_sys::crypto_aead_chacha20poly1305_ABYTES;
+pub const NETCODE_ENCRYPT_EXTA_BYTES: usize = libsodium_sys::crypto_aead_chacha20poly1305_ABYTES as usize;
 
 #[derive(Debug, Error)]
 pub enum EncryptError {
@@ -50,7 +50,7 @@ pub fn generate_key() -> [u8; NETCODE_KEY_BYTES] {
 pub fn random_bytes(out: &mut [u8]) {
     unsafe {
         init_sodium();
-        libsodium_sys::randombytes_buf(out.as_mut_ptr(), out.len());
+        libsodium_sys::randombytes_buf(out.as_mut_ptr() as *mut std::ffi::c_void, out.len());
     }
 }
 
@@ -80,8 +80,8 @@ pub fn encode(out: &mut [u8], data: &[u8], additional_data: Option<&[u8]>, nonce
                 additional_data.map_or(::std::ptr::null_mut(), |v| v.as_ptr()),
                 additional_data.map_or(0, |v| v.len()) as u64,
                 ::std::ptr::null(),
-                &final_nonce,
-                key);
+                final_nonce.as_ptr(),
+                key.as_ptr());
 
         (result, written)
     };
@@ -118,8 +118,8 @@ pub fn decode(out: &mut [u8], data: &[u8], additional_data: Option<&[u8]>, nonce
                 data.len() as u64,
                 additional_data.map_or(::std::ptr::null_mut(), |v| v.as_ptr()),
                 additional_data.map_or(0, |v| v.len()) as u64,
-                &final_nonce,
-                key);
+                final_nonce.as_ptr(),
+                key.as_ptr());
 
         (result, read)
     };
