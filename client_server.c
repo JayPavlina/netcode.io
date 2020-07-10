@@ -1,7 +1,7 @@
 /*
     netcode.io reference implementation
 
-    Copyright © 2017, The Network Protocol Company, Inc.
+    Copyright © 2017 - 2019, The Network Protocol Company, Inc.
 
     Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 
@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <signal.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
 #define CONNECT_TOKEN_EXPIRY 30
 #define CONNECT_TOKEN_TIMEOUT 5
@@ -79,7 +80,7 @@ int main( int argc, char ** argv )
     server_config.protocol_id = PROTOCOL_ID;
     memcpy( &server_config.private_key, private_key, NETCODE_KEY_BYTES );
 
-    char * server_address = "[::1]:40000";
+    char * server_address = "[::1]:00000";
 
     struct netcode_server_t * server = netcode_server_create( server_address, &server_config, time );
 
@@ -91,13 +92,20 @@ int main( int argc, char ** argv )
 
     netcode_server_start( server, 1 );
 
+    // Create updated server address that includes system assigned port.
+    char *updated_server_address = calloc(256, 1);
+    snprintf(updated_server_address, 256, "[::1]:%i", netcode_server_get_port(server));
+
     uint8_t connect_token[NETCODE_CONNECT_TOKEN_BYTES];
 
     uint64_t client_id = 0;
     netcode_random_bytes( (uint8_t*) &client_id, 8 );
     printf( "client id is %.16" PRIx64 "\n", client_id );
 
-    if ( netcode_generate_connect_token( 1, (NETCODE_CONST char**) &server_address, (NETCODE_CONST char**) &server_address, CONNECT_TOKEN_EXPIRY, CONNECT_TOKEN_TIMEOUT, client_id, PROTOCOL_ID, 0, private_key, connect_token ) != NETCODE_OK )
+    uint8_t user_data[NETCODE_USER_DATA_BYTES];
+    netcode_random_bytes(user_data, NETCODE_USER_DATA_BYTES);
+
+    if ( netcode_generate_connect_token( 1, (NETCODE_CONST char**) &updated_server_address, (NETCODE_CONST char**) &updated_server_address, CONNECT_TOKEN_EXPIRY, CONNECT_TOKEN_TIMEOUT, client_id, PROTOCOL_ID, private_key, user_data, connect_token ) != NETCODE_OK )
     {
         printf( "error: failed to generate connect token\n" );
         return 1;
@@ -187,6 +195,9 @@ int main( int argc, char ** argv )
     netcode_client_destroy( client );
 
     netcode_term();
+
+    free(updated_server_address);
+    updated_server_address = NULL;
     
     return 0;
 }

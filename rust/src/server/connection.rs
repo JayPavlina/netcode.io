@@ -1,10 +1,10 @@
-use crate::server;
 use crate::channel::Channel;
+use crate::server;
 
 /// Current state of the client connection.
 #[derive(Clone, Debug)]
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
 pub enum ConnectionState {
     /// We've recieved the initial packet but response is outstanding yet.
     PendingResponse,
@@ -13,7 +13,7 @@ pub enum ConnectionState {
     /// Client timed out from heartbeat packets.
     TimedOut,
     /// Client has cleanly disconnected.
-    Disconnected
+    Disconnected,
 }
 
 /// Handle to client connection.
@@ -21,5 +21,5 @@ pub enum ConnectionState {
 pub struct Connection {
     pub client_id: server::ClientId,
     pub state: ConnectionState,
-    pub channel: Channel
+    pub channel: Channel,
 }

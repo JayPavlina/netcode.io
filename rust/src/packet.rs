@@ -1,7 +1,7 @@
 use std::io;
 use std::io::Write;
 
-use byteorder::{WriteBytesExt, ReadBytesExt, LittleEndian};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::common::*;
 use crate::crypto;
@@ -16,7 +16,7 @@ const PACKET_PAYLOAD: u8 = 5;
 const PACKET_DISCONNECT: u8 = 6;
 
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(large_enum_variant))]
+#[cfg_attr(feature = "cargo-clippy", allow(large_enum_variant))]
 pub enum Packet {
     ConnectionRequest(ConnectionRequestPacket),
     ConnectionDenied,
@@ -24,7 +24,7 @@ pub enum Packet {
     Response(ResponsePacket),
     KeepAlive(KeepAlivePacket),
     Payload(usize),
-    Disconnect
+    Disconnect,
 }
 
 impl Packet {
@@ -36,18 +36,20 @@ impl Packet {
             Packet::Response(_) => PACKET_RESPONSE,
             Packet::KeepAlive(_) => PACKET_KEEPALIVE,
             Packet::Payload(_) => PACKET_PAYLOAD,
-            Packet::Disconnect => PACKET_DISCONNECT
+            Packet::Disconnect => PACKET_DISCONNECT,
         }
     }
 
-    fn write<W>(&self, out: &mut W) -> Result<(), io::Error> where W: io::Write {
+    fn write<W>(&self, out: &mut W) -> Result<(), io::Error>
+    where
+        W: io::Write,
+    {
         match *self {
             Packet::ConnectionRequest(ref p) => p.write(out),
             Packet::Challenge(ref p) => p.write(out),
             Packet::Response(ref p) => p.write(out),
             Packet::KeepAlive(ref p) => p.write(out),
-            Packet::ConnectionDenied | Packet::Payload(_) | Packet::Disconnect => Ok(())
-
+            Packet::ConnectionDenied | Packet::Payload(_) | Packet::Disconnect => Ok(()),
         }
     }
 }
@@ -57,17 +59,16 @@ fn decode_prefix(value: u8) -> (u8, usize) {
 }
 
 // TODO: fix me
-#[cfg_attr(feature="cargo-clippy", allow(cast_possible_truncation))]
+#[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation))]
 fn encode_prefix(value: u8, sequence: u64) -> u8 {
     value | ((sequence_bytes_required(sequence) as u8) << 4)
 }
 
-fn sequence_bytes_required(sequence: u64) -> usize
-{
+fn sequence_bytes_required(sequence: u64) -> usize {
     let mut mask: u64 = 0xFF00_0000_0000_0000;
     for i in 0..8 {
         if (sequence & mask) != 0x00 {
-            return 8 - i
+            return 8 - i;
         }
 
         mask >>= 8;
@@ -77,8 +78,8 @@ fn sequence_bytes_required(sequence: u64) -> usize
 }
 
 // TODO: fix me
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
-#[derive(Debug, Error)]
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
+#[derive(Debug, err_derive::Error)]
 pub enum PacketError {
     #[error(display = "InvalidPrivateKey")]
     InvalidPrivateKey,
@@ -91,7 +92,10 @@ pub enum PacketError {
 }
 
 
-fn write_sequence<W>(out: &mut W, seq: u64) -> Result<usize, io::Error> where W: io::Write {
+fn write_sequence<W>(out: &mut W, seq: u64) -> Result<usize, io::Error>
+where
+    W: io::Write,
+{
     let len = sequence_bytes_required(seq);
 
     let mut sequence_scratch = [0; 8];
@@ -100,13 +104,19 @@ fn write_sequence<W>(out: &mut W, seq: u64) -> Result<usize, io::Error> where W:
     out.write(&sequence_scratch[0..len])
 }
 
-fn read_sequence<R>(source: &mut R, len: usize) -> Result<u64, io::Error> where R: io::Read {
+fn read_sequence<R>(source: &mut R, len: usize) -> Result<u64, io::Error>
+where
+    R: io::Read,
+{
     let mut seq_scratch = [0; 8];
     source.read_exact(&mut seq_scratch[0..len])?;
     io::Cursor::new(&seq_scratch).read_u64::<LittleEndian>()
 }
 
-fn get_additional_data(prefix: u8, protocol_id: u64) -> Result<[u8; NETCODE_VERSION_LEN + 8 + 1], io::Error> {
+fn get_additional_data(
+    prefix: u8,
+    protocol_id: u64,
+) -> Result<[u8; NETCODE_VERSION_LEN + 8 + 1], io::Error> {
     let mut buffer = [0; NETCODE_VERSION_LEN + 8 + 1];
 
     {
@@ -120,25 +130,38 @@ fn get_additional_data(prefix: u8, protocol_id: u64) -> Result<[u8; NETCODE_VERS
     Ok(buffer)
 }
 
-pub fn decode(data: &[u8], protocol_id: u64, private_key: Option<&[u8; NETCODE_KEY_BYTES]>, out: &mut [u8; NETCODE_MAX_PAYLOAD_SIZE])
-        -> Result<(u64, Packet), PacketError> {
+pub fn decode(
+    data: &[u8],
+    protocol_id: u64,
+    private_key: Option<&[u8; NETCODE_KEY_BYTES]>,
+    out: &mut [u8; NETCODE_MAX_PAYLOAD_SIZE],
+) -> Result<(u64, Packet), PacketError> {
     let source = &mut io::Cursor::new(data);
     let prefix_byte = source.read_u8()?;
     let (ty, sequence_len) = decode_prefix(prefix_byte);
 
     if ty == PACKET_CONNECTION {
-        Ok((0, Packet::ConnectionRequest(ConnectionRequestPacket::read(source)?)))
+        Ok((
+            0,
+            Packet::ConnectionRequest(ConnectionRequestPacket::read(source)?),
+        ))
     } else if let Some(private_key) = private_key {
         //Sequence length is variable on the wire so we have to serialize only
         //the number of bytes we were told exist.
         let sequence = read_sequence(source, sequence_len)?;
 
         // TODO: fix me
-        #[cfg_attr(feature="cargo-clippy", allow(cast_possible_truncation))]
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation))]
         let payload = &data[source.position() as usize..];
         let additional_data = get_additional_data(prefix_byte, protocol_id)?;
 
-        let decoded_len = crypto::decode(out, payload, Some(&additional_data[..]), sequence, private_key)?;
+        let decoded_len = crypto::decode(
+            out,
+            payload,
+            Some(&additional_data[..]),
+            sequence,
+            private_key,
+        )?;
 
         let source_data = &mut io::Cursor::new(&out[..decoded_len]);
 
@@ -147,11 +170,9 @@ pub fn decode(data: &[u8], protocol_id: u64, private_key: Option<&[u8; NETCODE_K
             PACKET_CHALLENGE => Ok(Packet::Challenge(ChallengePacket::read(source_data)?)),
             PACKET_RESPONSE => Ok(Packet::Response(ResponsePacket::read(source_data)?)),
             PACKET_KEEPALIVE => Ok(Packet::KeepAlive(KeepAlivePacket::read(source_data)?)),
-            PACKET_PAYLOAD => {
-                Ok(Packet::Payload(decoded_len))
-            },
+            PACKET_PAYLOAD => Ok(Packet::Payload(decoded_len)),
             PACKET_DISCONNECT => Ok(Packet::Disconnect),
-            PACKET_CONNECTION | _ => Err(PacketError::InvalidPacket)
+            PACKET_CONNECTION | _ => Err(PacketError::InvalidPacket),
         };
 
         packet.map(|p| (sequence, p))
@@ -160,8 +181,13 @@ pub fn decode(data: &[u8], protocol_id: u64, private_key: Option<&[u8; NETCODE_K
     }
 }
 
-pub fn encode(out: &mut [u8], protocol_id: u64, packet: &Packet, crypt_info: Option<(u64, &[u8; NETCODE_KEY_BYTES])>, payload: Option<&[u8]>)
-        -> Result<usize, PacketError> {
+pub fn encode(
+    out: &mut [u8],
+    protocol_id: u64,
+    packet: &Packet,
+    crypt_info: Option<(u64, &[u8; NETCODE_KEY_BYTES])>,
+    payload: Option<&[u8]>,
+) -> Result<usize, PacketError> {
     if let Packet::ConnectionRequest(ref req) = *packet {
         let mut writer = io::Cursor::new(&mut out[..]);
 
@@ -170,7 +196,7 @@ pub fn encode(out: &mut [u8], protocol_id: u64, packet: &Packet, crypt_info: Opt
         req.write(&mut writer)?;
 
         // TODO: fix me
-        #[cfg_attr(feature="cargo-clippy", allow(cast_possible_truncation))]
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation))]
         Ok(writer.position() as usize)
     } else if let Some((sequence, private_key)) = crypt_info {
         let (prefix_byte, offset) = {
@@ -199,16 +225,17 @@ pub fn encode(out: &mut [u8], protocol_id: u64, packet: &Packet, crypt_info: Opt
         let additional_data = get_additional_data(prefix_byte, protocol_id)?;
 
         // TODO: fix me
-        #[cfg_attr(feature="cargo-clippy", allow(cast_possible_truncation))]
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation))]
         let crypt_write = crypto::encode(
             &mut out[offset as usize..],
             &scratch[..scratch_written as usize],
             Some(&additional_data[..]),
             sequence,
-            private_key)?;
+            private_key,
+        )?;
 
         // TODO: fix me
-        #[cfg_attr(feature="cargo-clippy", allow(cast_possible_truncation))]
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation))]
         Ok(offset as usize + crypt_write)
     } else {
         Err(PacketError::InvalidPrivateKey)
@@ -216,13 +243,13 @@ pub fn encode(out: &mut [u8], protocol_id: u64, packet: &Packet, crypt_info: Opt
 }
 
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
 pub struct ConnectionRequestPacket {
     pub version: [u8; NETCODE_VERSION_LEN],
     pub protocol_id: u64,
     pub token_expire: u64,
     pub sequence: u64,
-    pub private_data: [u8; NETCODE_CONNECT_TOKEN_PRIVATE_BYTES]
+    pub private_data: [u8; NETCODE_CONNECT_TOKEN_PRIVATE_BYTES],
 }
 
 impl ConnectionRequestPacket {
@@ -232,11 +259,14 @@ impl ConnectionRequestPacket {
             protocol_id: token.protocol,
             token_expire: token.expire_utc,
             sequence: token.sequence,
-            private_data: token.private_data
+            private_data: token.private_data,
         }
     }
 
-    pub fn read<R>(source: &mut R) -> Result<Self, io::Error> where R: io::Read {
+    pub fn read<R>(source: &mut R) -> Result<Self, io::Error>
+    where
+        R: io::Read,
+    {
         let mut version = [0; NETCODE_VERSION_LEN];
         source.read_exact(&mut version[..])?;
 
@@ -252,11 +282,14 @@ impl ConnectionRequestPacket {
             protocol_id,
             token_expire,
             sequence,
-            private_data
+            private_data,
         })
     }
 
-    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error> where W: io::Write {
+    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error>
+    where
+        W: io::Write,
+    {
         out.write_all(&self.version)?;
         out.write_u64::<LittleEndian>(self.protocol_id)?;
         out.write_u64::<LittleEndian>(self.token_expire)?;
@@ -269,44 +302,47 @@ impl ConnectionRequestPacket {
 
 pub struct ChallengeToken {
     pub client_id: u64,
-    pub user_data: [u8; NETCODE_USER_DATA_BYTES]
+    pub user_data: [u8; NETCODE_USER_DATA_BYTES],
 }
 
 impl Clone for ChallengeToken {
     fn clone(&self) -> Self {
         Self {
             client_id: self.client_id,
-            user_data: self.user_data
+            user_data: self.user_data,
         }
     }
 }
 
 impl ChallengeToken {
-    pub fn generate(client_id: u64,
-            connect_user_data: &[u8; NETCODE_USER_DATA_BYTES])
-                -> Self {
-
+    pub fn generate(client_id: u64, connect_user_data: &[u8; NETCODE_USER_DATA_BYTES]) -> Self {
         let mut user_data = [0; NETCODE_USER_DATA_BYTES];
         user_data.copy_from_slice(connect_user_data);
 
         Self {
             client_id,
-            user_data
+            user_data,
         }
     }
 
-    pub fn read<R>(source: &mut R) -> Result<Self, io::Error> where R: io::Read {
+    pub fn read<R>(source: &mut R) -> Result<Self, io::Error>
+    where
+        R: io::Read,
+    {
         let client_id = source.read_u64::<LittleEndian>()?;
         let mut user_data = [0; NETCODE_USER_DATA_BYTES];
         source.read_exact(&mut user_data)?;
 
         Ok(Self {
             client_id,
-            user_data
+            user_data,
         })
     }
 
-    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error> where W: io::Write {
+    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error>
+    where
+        W: io::Write,
+    {
         out.write_u64::<LittleEndian>(self.client_id)?;
         out.write_all(&self.user_data)?;
 
@@ -314,17 +350,17 @@ impl ChallengeToken {
     }
 }
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
 
 pub struct ChallengePacket {
     pub token_sequence: u64,
-    pub token_data: [u8; NETCODE_CHALLENGE_TOKEN_BYTES]
+    pub token_data: [u8; NETCODE_CHALLENGE_TOKEN_BYTES],
 }
 
 #[derive(Debug)]
 pub enum ChallengeEncodeError {
     Io(io::Error),
-    Encrypt(crypto::EncryptError)
+    Encrypt(crypto::EncryptError),
 }
 
 impl From<io::Error> for ChallengeEncodeError {
@@ -340,44 +376,66 @@ impl From<crypto::EncryptError> for ChallengeEncodeError {
 }
 
 impl ChallengePacket {
-    pub fn generate(client_id: u64,
-            connect_user_data: &[u8; NETCODE_USER_DATA_BYTES],
-            challenge_sequence: u64,
-            challenge_key: &[u8; NETCODE_KEY_BYTES])
-            -> Result<Self, ChallengeEncodeError> {
+    pub fn generate(
+        client_id: u64,
+        connect_user_data: &[u8; NETCODE_USER_DATA_BYTES],
+        challenge_sequence: u64,
+        challenge_key: &[u8; NETCODE_KEY_BYTES],
+    ) -> Result<Self, ChallengeEncodeError> {
         let token = ChallengeToken::generate(client_id, connect_user_data);
         let mut scratch = [0; NETCODE_CHALLENGE_TOKEN_BYTES - NETCODE_MAC_BYTES];
         token.write(&mut io::Cursor::new(&mut scratch[..]))?;
 
         let mut token_data = [0; NETCODE_CHALLENGE_TOKEN_BYTES];
-        crypto::encode(&mut token_data[..], &scratch[..], None, challenge_sequence, challenge_key)?;
+        crypto::encode(
+            &mut token_data[..],
+            &scratch[..],
+            None,
+            challenge_sequence,
+            challenge_key,
+        )?;
 
         Ok(Self {
             token_sequence: challenge_sequence,
-            token_data
+            token_data,
         })
     }
 
     #[cfg(test)]
-    pub fn decode(&self, challenge_key: &[u8; NETCODE_KEY_BYTES]) -> Result<ChallengeToken, ChallengeEncodeError> {
+    pub fn decode(
+        &self,
+        challenge_key: &[u8; NETCODE_KEY_BYTES],
+    ) -> Result<ChallengeToken, ChallengeEncodeError> {
         let mut decoded = [0; NETCODE_CHALLENGE_TOKEN_BYTES];
-        crypto::decode(&mut decoded, &self.token_data, None, self.token_sequence, challenge_key)?;
+        crypto::decode(
+            &mut decoded,
+            &self.token_data,
+            None,
+            self.token_sequence,
+            challenge_key,
+        )?;
 
         ChallengeToken::read(&mut io::Cursor::new(&decoded[..])).map_err(|e| e.into())
     }
 
-    pub fn read<R>(source: &mut R) -> Result<Self, io::Error> where R: io::Read {
+    pub fn read<R>(source: &mut R) -> Result<Self, io::Error>
+    where
+        R: io::Read,
+    {
         let token_sequence = source.read_u64::<LittleEndian>()?;
         let mut token_data = [0; NETCODE_CHALLENGE_TOKEN_BYTES];
         source.read_exact(&mut token_data)?;
 
         Ok(Self {
             token_sequence,
-            token_data
+            token_data,
         })
     }
 
-    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error> where W: io::Write {
+    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error>
+    where
+        W: io::Write,
+    {
         out.write_u64::<LittleEndian>(self.token_sequence)?;
         out.write_all(&self.token_data)?;
 
@@ -386,32 +444,47 @@ impl ChallengePacket {
 }
 
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
 pub struct ResponsePacket {
     pub token_sequence: u64,
-    pub token_data: [u8; NETCODE_CHALLENGE_TOKEN_BYTES]
+    pub token_data: [u8; NETCODE_CHALLENGE_TOKEN_BYTES],
 }
 
 impl ResponsePacket {
-    pub fn read<R>(source: &mut R) -> Result<Self, io::Error> where R: io::Read {
+    pub fn read<R>(source: &mut R) -> Result<Self, io::Error>
+    where
+        R: io::Read,
+    {
         let token_sequence = source.read_u64::<LittleEndian>()?;
         let mut token_data = [0; NETCODE_CHALLENGE_TOKEN_BYTES];
         source.read_exact(&mut token_data)?;
 
         Ok(Self {
             token_sequence,
-            token_data
+            token_data,
         })
     }
 
-    pub fn decode(&self, challenge_key: &[u8; NETCODE_KEY_BYTES]) -> Result<ChallengeToken, ChallengeEncodeError> {
+    pub fn decode(
+        &self,
+        challenge_key: &[u8; NETCODE_KEY_BYTES],
+    ) -> Result<ChallengeToken, ChallengeEncodeError> {
         let mut decoded = [0; NETCODE_CHALLENGE_TOKEN_BYTES];
-        crypto::decode(&mut decoded, &self.token_data, None, self.token_sequence, challenge_key)?;
+        crypto::decode(
+            &mut decoded,
+            &self.token_data,
+            None,
+            self.token_sequence,
+            challenge_key,
+        )?;
 
         ChallengeToken::read(&mut io::Cursor::new(&decoded[..])).map_err(|e| e.into())
     }
 
-    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error> where W: io::Write {
+    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error>
+    where
+        W: io::Write,
+    {
         out.write_u64::<LittleEndian>(self.token_sequence)?;
         out.write_all(&self.token_data)?;
 
@@ -420,21 +493,27 @@ impl ResponsePacket {
 }
 
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
 pub struct KeepAlivePacket {
     pub client_idx: i32,
-    pub max_clients: i32
+    pub max_clients: i32,
 }
 
 impl KeepAlivePacket {
-    pub fn read<R>(source: &mut R) -> Result<Self, io::Error> where R: io::Read {
+    pub fn read<R>(source: &mut R) -> Result<Self, io::Error>
+    where
+        R: io::Read,
+    {
         Ok(Self {
             client_idx: source.read_i32::<LittleEndian>()?,
-            max_clients: source.read_i32::<LittleEndian>()?
+            max_clients: source.read_i32::<LittleEndian>()?,
         })
     }
 
-    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error> where W: io::Write {
+    pub fn write<W>(&self, out: &mut W) -> Result<(), io::Error>
+    where
+        W: io::Write,
+    {
         out.write_i32::<LittleEndian>(self.client_idx)?;
         out.write_i32::<LittleEndian>(self.max_clients)?;
 
@@ -446,7 +525,14 @@ impl KeepAlivePacket {
 fn test_seq_value(v: u64) {
     let mut scratch = [0; 8];
     write_sequence(&mut io::Cursor::new(&mut scratch[..]), v).unwrap();
-    assert_eq!(v, read_sequence(&mut io::Cursor::new(&scratch[..]), sequence_bytes_required(v)).unwrap());
+    assert_eq!(
+        v,
+        read_sequence(
+            &mut io::Cursor::new(&scratch[..]),
+            sequence_bytes_required(v)
+        )
+        .unwrap()
+    );
 }
 
 #[test]
@@ -455,7 +541,7 @@ fn test_sequence() {
 
     for i in 0..8 {
         test_seq_value(bits);
-        assert_eq!(i+1, sequence_bytes_required(bits));
+        assert_eq!(i + 1, sequence_bytes_required(bits));
         bits <<= 8;
     }
 }
@@ -463,12 +549,13 @@ fn test_sequence() {
 #[cfg(test)]
 #[allow(unused_variables)]
 fn test_encode_decode<V>(
-        packet: Packet,
-        payload: Option<&[u8]>,
-        private_key: Option<[u8; NETCODE_KEY_BYTES]>,
-        verify: V)
-            where V: Fn(Packet)
-        {
+    packet: Packet,
+    payload: Option<&[u8]>,
+    private_key: Option<[u8; NETCODE_KEY_BYTES]>,
+    verify: V,
+) where
+    V: Fn(Packet),
+{
     let sequence = if let Packet::ConnectionRequest(_) = packet {
         0x0
     } else {
@@ -480,13 +567,25 @@ fn test_encode_decode<V>(
 
     let mut scratch = [0; NETCODE_MAX_PACKET_SIZE];
     let mut out_packet = [0; NETCODE_MAX_PAYLOAD_SIZE];
-    let length = encode(&mut scratch[..], protocol_id, &packet, Some((sequence, &pkey)), payload).unwrap();
-    match decode(&scratch[..length], protocol_id, Some(&pkey), &mut out_packet) {
-        Ok((s,p)) => {
+    let length = encode(
+        &mut scratch[..],
+        protocol_id,
+        &packet,
+        Some((sequence, &pkey)),
+        payload,
+    )
+    .unwrap();
+    match decode(
+        &scratch[..length],
+        protocol_id,
+        Some(&pkey),
+        &mut out_packet,
+    ) {
+        Ok((s, p)) => {
             assert_eq!(s, sequence);
             verify(p);
-        },
-        Err(e) => assert!(false, "{:?}", e)
+        }
+        Err(e) => assert!(false, "{:?}", e),
     }
 
     if let Some(in_payload) = payload {
@@ -494,40 +593,40 @@ fn test_encode_decode<V>(
             assert_eq!(in_payload[i], out_packet[i]);
         }
     }
-/*
-    unsafe {
-        #[allow(unused_variables)]
-        let lock = ::common::test::FFI_LOCK.lock().unwrap();
+    /*
+        unsafe {
+            #[allow(unused_variables)]
+            let lock = ::common::test::FFI_LOCK.lock().unwrap();
 
-        use capi;
+            use capi;
 
-        let mut replay: capi::netcode_replay_protection_t = ::std::mem::uninitialized();
-        capi::netcode_replay_protection_reset(&mut replay);
+            let mut replay: capi::netcode_replay_protection_t = ::std::mem::uninitialized();
+            capi::netcode_replay_protection_reset(&mut replay);
 
-        let mut allowed_packets = [1; capi::NETCODE_CONNECTION_NUM_PACKETS as usize];
+            let mut allowed_packets = [1; capi::NETCODE_CONNECTION_NUM_PACKETS as usize];
 
-        let final_pkey = match private_key {
-            Some(ref mut v) => {
-                v.as_mut_ptr()
-            },
-            None => ::std::ptr::null_mut()
-        };
+            let final_pkey = match private_key {
+                Some(ref mut v) => {
+                    v.as_mut_ptr()
+                },
+                None => ::std::ptr::null_mut()
+            };
 
-        let result = capi::netcode_read_packet(
-            scratch.as_mut_ptr(), length as i32, //data
-            &mut sequence,
-            pkey.as_mut_ptr(), //Recv private key
-            protocol_id, //Protocol id
-            0, //Current timestamp
-            final_pkey, //Private key
-            allowed_packets.as_mut_ptr(), //Allowed packets
-            &mut replay); //Replay protection
+            let result = capi::netcode_read_packet(
+                scratch.as_mut_ptr(), length as i32, //data
+                &mut sequence,
+                pkey.as_mut_ptr(), //Recv private key
+                protocol_id, //Protocol id
+                0, //Current timestamp
+                final_pkey, //Private key
+                allowed_packets.as_mut_ptr(), //Allowed packets
+                &mut replay); //Replay protection
 
-        assert!(result != ::std::ptr::null_mut());
+            assert!(result != ::std::ptr::null_mut());
 
-        capi::free(result);
-    }
-*/
+            capi::free(result);
+        }
+    */
 }
 
 #[test]
@@ -541,57 +640,54 @@ fn test_conn_packet() {
     let pkey = crypto::generate_key();
 
     let token = token::ConnectToken::generate(
-                        [SocketAddr::from_str("127.0.0.1:8080").unwrap()].iter().cloned(),
-                        &pkey,
-                        30, //Expire
-                        sequence,
-                        protocol_id,
-                        0xFFEE, //Client Id
-                        None).unwrap();
+        [SocketAddr::from_str("127.0.0.1:8080").unwrap()]
+            .iter()
+            .cloned(),
+        &pkey,
+        30, //Expire
+        sequence,
+        protocol_id,
+        0xFFEE, //Client Id
+        None,
+    )
+    .unwrap();
 
     let packet = Packet::ConnectionRequest(ConnectionRequestPacket {
         protocol_id,
         sequence,
         version: NETCODE_VERSION_STRING.clone(),
         token_expire: token.expire_utc,
-        private_data: token.private_data
+        private_data: token.private_data,
     });
 
-    test_encode_decode(packet,
-        None,
-        Some(pkey),
-        |p| {
-            match p {
-                Packet::ConnectionRequest(p) => {
-                    for i in 0..p.version.len() {
-                        assert_eq!(p.version[i], NETCODE_VERSION_STRING[i], "mismatch at index {}", i);
-                    }
-
-                    assert_eq!(p.protocol_id, protocol_id);
-                    assert_eq!(p.token_expire, token.expire_utc);
-                    assert_eq!(p.sequence, sequence);
-
-                    for i in 0..p.private_data.len() {
-                        assert_eq!(p.private_data[i], token.private_data[i]);
-                    }
-                },
-                _ => assert!(false)
+    test_encode_decode(packet, None, Some(pkey), |p| match p {
+        Packet::ConnectionRequest(p) => {
+            for i in 0..p.version.len() {
+                assert_eq!(
+                    p.version[i], NETCODE_VERSION_STRING[i],
+                    "mismatch at index {}",
+                    i
+                );
             }
-        });
+
+            assert_eq!(p.protocol_id, protocol_id);
+            assert_eq!(p.token_expire, token.expire_utc);
+            assert_eq!(p.sequence, sequence);
+
+            for i in 0..p.private_data.len() {
+                assert_eq!(p.private_data[i], token.private_data[i]);
+            }
+        }
+        _ => assert!(false),
+    });
 }
 
 #[test]
 fn test_conn_denied_packet() {
-    test_encode_decode(
-        Packet::ConnectionDenied,
-        None,
-        None,
-        |p| {
-            match p {
-                Packet::ConnectionDenied => (),
-                _ => assert!(false)
-            }
-        });
+    test_encode_decode(Packet::ConnectionDenied, None, None, |p| match p {
+        Packet::ConnectionDenied => (),
+        _ => assert!(false),
+    });
 }
 
 #[test]
@@ -605,21 +701,19 @@ fn test_challenge_packet() {
     test_encode_decode(
         Packet::Challenge(ChallengePacket {
             token_sequence,
-            token_data
+            token_data,
         }),
         None,
         None,
-        |p| {
-            match p {
-                Packet::Challenge(p) => {
-                    assert_eq!(p.token_sequence, token_sequence);
-                    for i in 0..token_data.len() {
-                        assert_eq!(p.token_data[i], token_data[i]);
-                    }
-                },
-                _ => assert!(false)
+        |p| match p {
+            Packet::Challenge(p) => {
+                assert_eq!(p.token_sequence, token_sequence);
+                for i in 0..token_data.len() {
+                    assert_eq!(p.token_data[i], token_data[i]);
+                }
             }
-        }
+            _ => assert!(false),
+        },
     );
 }
 
@@ -634,21 +728,19 @@ fn test_response_packet() {
     test_encode_decode(
         Packet::Response(ResponsePacket {
             token_sequence,
-            token_data
+            token_data,
         }),
         None,
         None,
-        |p| {
-            match p {
-                Packet::Response(p) => {
-                    assert_eq!(p.token_sequence, token_sequence);
-                    for i in 0..token_data.len() {
-                        assert_eq!(p.token_data[i], token_data[i]);
-                    }
-                },
-                _ => assert!(false)
+        |p| match p {
+            Packet::Response(p) => {
+                assert_eq!(p.token_sequence, token_sequence);
+                for i in 0..token_data.len() {
+                    assert_eq!(p.token_data[i], token_data[i]);
+                }
             }
-        }
+            _ => assert!(false),
+        },
     );
 }
 
@@ -660,18 +752,16 @@ fn test_keep_alive_packet() {
     test_encode_decode(
         Packet::KeepAlive(KeepAlivePacket {
             client_idx,
-            max_clients
+            max_clients,
         }),
         None,
         None,
-        |p| {
-            match p {
-                Packet::KeepAlive(p) => {
-                    assert_eq!(p.client_idx, client_idx);
-                },
-                _ => assert!(false)
+        |p| match p {
+            Packet::KeepAlive(p) => {
+                assert_eq!(p.client_idx, client_idx);
             }
-        }
+            _ => assert!(false),
+        },
     );
 }
 
@@ -680,18 +770,10 @@ fn test_payload_packet() {
     for i in 1..NETCODE_MAX_PAYLOAD_SIZE {
         let data = (0..i).map(|v| v as u8).collect::<Vec<u8>>();
 
-        test_encode_decode(
-            Packet::Payload(i),
-            Some(&data[..]),
-            None,
-            |p| {
-                match p {
-                    Packet::Payload(c) => {
-                        assert_eq!(c, i)
-                    },
-                    _ => assert!(false)
-                }
-            });
+        test_encode_decode(Packet::Payload(i), Some(&data[..]), None, |p| match p {
+            Packet::Payload(c) => assert_eq!(c, i),
+            _ => assert!(false),
+        });
     }
 }
 
@@ -706,10 +788,9 @@ fn test_decode_challenge_token() {
     let challenge_sequence = 0xFED;
     let mut challenge_key = crypto::generate_key();
 
-    let challenge_packet = ChallengePacket::generate(client_id,
-                            &user_data,
-                            challenge_sequence,
-                            &challenge_key).unwrap();
+    let challenge_packet =
+        ChallengePacket::generate(client_id, &user_data, challenge_sequence, &challenge_key)
+            .unwrap();
 
     let decoded = challenge_packet.decode(&challenge_key).unwrap();
     assert_eq!(decoded.client_id, client_id);
@@ -717,7 +798,7 @@ fn test_decode_challenge_token() {
         assert_eq!(user_data[i], decoded.user_data[i]);
     }
 
-   unsafe {
+    unsafe {
         #[allow(unused_variables)]
         let lock = crate::common::test::FFI_LOCK.lock().unwrap();
 
@@ -730,7 +811,8 @@ fn test_decode_challenge_token() {
             capi_scratch.as_mut_ptr(),
             capi_scratch.len() as i32,
             challenge_sequence,
-            challenge_key.as_mut_ptr());
+            challenge_key.as_mut_ptr(),
+        );
 
         assert_eq!(decode, 1);
 
@@ -739,7 +821,8 @@ fn test_decode_challenge_token() {
         let serialize = capi::netcode_read_challenge_token(
             capi_scratch.as_mut_ptr(),
             capi_scratch.len() as i32,
-            &mut native_token);
+            &mut native_token,
+        );
 
         assert_eq!(serialize, 1);
         assert_eq!(native_token.client_id, client_id);

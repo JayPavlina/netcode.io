@@ -2,17 +2,17 @@ const REPLAY_BUFFER_SIZE: usize = 256;
 const EMPTY_ENTRY: u64 = 0xFFFF_FFFF_FFFF_FFFF;
 
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
 pub struct ReplayProtection {
     most_recent_sequence: u64,
-    received_packet: [u64; REPLAY_BUFFER_SIZE]
+    received_packet: [u64; REPLAY_BUFFER_SIZE],
 }
 
 impl Clone for ReplayProtection {
     fn clone(&self) -> Self {
         Self {
             most_recent_sequence: self.most_recent_sequence,
-            received_packet: self.received_packet
+            received_packet: self.received_packet,
         }
     }
 }
@@ -21,38 +21,38 @@ impl ReplayProtection {
     pub fn new() -> Self {
         Self {
             most_recent_sequence: 0,
-            received_packet: [EMPTY_ENTRY; REPLAY_BUFFER_SIZE]
+            received_packet: [EMPTY_ENTRY; REPLAY_BUFFER_SIZE],
         }
     }
 
     // TODO: fix me
-    #[cfg_attr(feature="cargo-clippy", allow(cast_possible_wrap))]
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_wrap))]
     pub fn packet_already_received(&mut self, sequence: u64) -> bool {
         if sequence & (1 << 63) == (1 << 63) {
             return false;
         }
 
         if sequence + (REPLAY_BUFFER_SIZE as u64) <= self.most_recent_sequence {
-            return true
+            return true;
         }
-        
+
         if sequence > self.most_recent_sequence {
             self.most_recent_sequence = sequence;
         }
 
         // TODO: fix me
-        #[cfg_attr(feature="cargo-clippy", allow(cast_possible_truncation))]
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_possible_truncation))]
         let index = sequence as usize % REPLAY_BUFFER_SIZE;
 
         if self.received_packet[index] == EMPTY_ENTRY {
             self.received_packet[index] = sequence;
-            return false
+            return false;
         }
 
         if self.received_packet[index] >= sequence {
-            return true
+            return true;
         }
-        
+
         self.received_packet[index] = sequence;
 
         false
@@ -67,7 +67,7 @@ fn test_replay_protection() {
         assert_eq!(replay_protection.most_recent_sequence, 0);
 
         // sequence numbers with high bit set should be ignored
-        assert!(!replay_protection.packet_already_received(1<<63));
+        assert!(!replay_protection.packet_already_received(1 << 63));
         assert_eq!(replay_protection.most_recent_sequence, 0);
 
         // the first time we receive packets, they should not be already received
@@ -81,12 +81,14 @@ fn test_replay_protection() {
         assert!(replay_protection.packet_already_received(0));
 
         // packets received a second time should be flagged already received
-        for sequence in MAX_SEQUENCE-10..MAX_SEQUENCE {
+        for sequence in MAX_SEQUENCE - 10..MAX_SEQUENCE {
             assert!(replay_protection.packet_already_received(sequence));
         }
 
         // jumping ahead to a much higher sequence should be considered not already received
-        assert!(!replay_protection.packet_already_received(MAX_SEQUENCE + REPLAY_BUFFER_SIZE as u64));
+        assert!(
+            !replay_protection.packet_already_received(MAX_SEQUENCE + REPLAY_BUFFER_SIZE as u64)
+        );
 
         // old packets should be considered already received
         for sequence in 0..MAX_SEQUENCE {

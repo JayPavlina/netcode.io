@@ -1,4 +1,4 @@
-# netcode.io 1.01
+# netcode.io 1.02
 
 **netcode.io** is a simple protocol for creating secure client/server connections over UDP.
 
@@ -77,13 +77,13 @@ Prior to encryption the private connect token data has the following binary form
 
 This data is variable size but for simplicity is written to a fixed size buffer of 1024 bytes. Unused bytes are zero padded.
 
-Encryption of the private connect token data is performed with the libsodium AEAD primitive *crypto_aead_chacha20poly1305_ietf_encrypt* using the following binary data as the _associated data_: 
+Encryption of the private connect token data is performed with the libsodium AEAD primitive *crypto_aead_xchacha20poly1305_ietf_encrypt* using the following binary data as the _associated data_: 
 
-    [version info] (13 bytes)       // "NETCODE 1.01" ASCII with null terminator.
+    [version info] (13 bytes)       // "NETCODE 1.02" ASCII with null terminator.
     [protocol id] (uint64)          // 64 bit value unique to this particular game/application
     [expire timestamp] (uint64)     // 64 bit unix timestamp when this connect token expires
 
-The nonce used for encryption is a 64 bit sequence number that starts at zero and increases with each connect token generated. The sequence number is extended by padding high bits with zero to create a 96 bit nonce.
+The nonce used for encryption is a 24 bytes number that is randomly generated for every token.
 
 Encryption is performed on the first 1024 - 16 bytes in the buffer, leaving the last 16 bytes to store the HMAC:
 
@@ -94,11 +94,11 @@ Post encryption, this is referred to as the _encrypted private connect token dat
 
 Together the public and private data form a _connect token_:
 
-    [version info] (13 bytes)       // "NETCODE 1.01" ASCII with null terminator.
+    [version info] (13 bytes)       // "NETCODE 1.02" ASCII with null terminator.
     [protocol id] (uint64)          // 64 bit value unique to this particular game/application
     [create timestamp] (uint64)     // 64 bit unix timestamp when this connect token was created
     [expire timestamp] (uint64)     // 64 bit unix timestamp when this connect token expires
-    [connect token sequence] (uint64)
+    [connect token nonce] (24 bytes)
     [encrypted private connect token data] (1024 bytes)
     [timeout seconds] (uint32)      // timeout in seconds. negative values disable timeout (dev only)
     [num_server_addresses] (uint32) // in [1,32]
@@ -168,7 +168,7 @@ This is referred to as the _encrypted challenge token data_.
 The first packet type _connection request packet_ (0) is not encrypted and has the following format:
 
     0 (uint8) // prefix byte of zero
-    [version info] (13 bytes)       // "NETCODE 1.01" ASCII with null terminator.
+    [version info] (13 bytes)       // "NETCODE 1.02" ASCII with null terminator.
     [protocol id] (8 bytes)
     [connect token expire timestamp] (8 bytes)
     [connect token sequence number] (8 bytes)
@@ -229,7 +229,7 @@ _connection disconnect packet_:
 
 The per-packet type data is encrypted using the libsodium AEAD primitive *crypto_aead_chacha20poly1305_ietf_encrypt* with the following binary data as the _associated data_: 
 
-    [version info] (13 bytes)       // "NETCODE 1.01" ASCII with null terminator.
+    [version info] (13 bytes)       // "NETCODE 1.02" ASCII with null terminator.
     [protocol id] (uint64)          // 64 bit value unique to this particular game/application
     [prefix byte] (uint8)           // prefix byte in packet. stops an attacker from modifying packet type.
 
@@ -262,10 +262,6 @@ The following steps are taken when reading an encrypted packet, in this exact or
 
 * If the packet size is less than 1 + sequence bytes + 16, it cannot possibly be valid, ignore the packet.
 
-* If the packet type fails the replay protection test, ignore the packet. _See the section on replay protection below for details_.
-
-* If the per-packet type data fails to decrypt, ignore the packet.
-
 * If the per-packet type data size does not match the expected size for the packet type, ignore the packet.
 
     * 0 bytes for _connection denied packet_
@@ -274,6 +270,12 @@ The following steps are taken when reading an encrypted packet, in this exact or
     * 8 bytes for _connection keep-alive packet_
     * [1,1200] bytes for _connection payload packet_
     * 0 bytes for _connection disconnect packet_
+
+* If the packet type fails the replay protection already received test, ignore the packet. _See the section on replay protection below for details_.
+
+* If the per-packet type data fails to decrypt, ignore the packet.
+
+* Advance the most recent replay protection sequence #. _See the section on replay protection below for details_.
 
 * If all the above checks pass, the packet is processed.
 
@@ -293,9 +295,9 @@ The replay protection algorithm is as follows:
 
 1. Any packet older than the most recent sequence number received, minus the _replay buffer size_, is discarded on the receiver side.
 
-2. When a packet arrives that is newer than the most recent sequence number received, the most recent sequence number is updated on the receiver side and the packet is accepted.
+2. If a packet arrives that is within _replay buffer size_ of the most recent sequence number, it is accepted only if its sequence number has not already been received, otherwise it is ignored.
 
-3. If a packet arrives that is within _replay buffer size_ of the most recent sequence number, it is accepted only if its sequence number has not already been received, otherwise it is ignored.
+3. After the packet has been successfully decrypted, a) if the packet sequence # is in the replay buffer window that entry is set as received, and b) the most recent sequence number is updated if the packet sequence # is > than the previous most recent sequence number received.
 
 Replay protection is applied to the following packet types on both client and server:
 
@@ -402,7 +404,7 @@ The server follows these strict rules when processing connection requests:
 When a server receives a connection request packet from a client it contains the following data:
 
     0 (uint8) // prefix byte of zero
-    [version info] (13 bytes)       // "NETCODE 1.01" ASCII with null terminator.
+    [version info] (13 bytes)       // "NETCODE 1.02" ASCII with null terminator.
     [protocol id] (8 bytes)
     [connect token expire timestamp] (8 bytes)
     [connect token sequence number] (8 bytes)
@@ -418,7 +420,7 @@ The server takes the following steps, in this exact order, when processing a _co
 
 * If the packet is not the expected size of 1062 bytes, ignore the packet.
 
-* If the version info in the packet doesn't match "NETCODE 1.01" (13 bytes, with null terminator), ignore the packet.
+* If the version info in the packet doesn't match "NETCODE 1.02" (13 bytes, with null terminator), ignore the packet.
 
 * If the protocol id in the packet doesn't match the expected protocol id of the dedicated server, ignore the packet.
 

@@ -1,12 +1,7 @@
-#![allow(warnings)]
-extern crate cc;
-extern crate bindgen;
-
-
 use std::env;
-use std::path::PathBuf;
 use std::fs::File;
-use std::time::{Duration};
+use std::path::PathBuf;
+use std::time::Duration;
 
 pub fn main() {
     cc::Build::new()
@@ -21,22 +16,25 @@ pub fn main() {
     let private_path = out_path.join("private_bindings.rs");
 
     //Do some basic dependecy management
-    let targets = vec!(&private_path);
-    let source = vec!("rust/build.rs", "netcode.c", "netcode.h").iter()
-        .map(|v| PathBuf::from(v))
+    let targets = vec![&private_path];
+    let source = vec!["rust/build.rs", "netcode.c", "netcode.h"]
+        .iter()
+        .map(PathBuf::from)
         .collect::<Vec<_>>();
 
-    let newest_source = source.iter()
+    let newest_source = source
+        .iter()
         .map(|v| {
             File::open(v)
                 .and_then(|f| f.metadata())
                 .and_then(|m| m.modified())
-                .expect(format!("Source file {:?} not found", v).as_str())
+                .unwrap_or_else(|_| panic!("Source file {:?} not found", v))
         })
         .max()
         .unwrap();
 
-    let oldest_target = targets.iter()
+    let oldest_target = targets
+        .iter()
         .filter_map(|v| {
             File::open(v)
                 .and_then(|f| f.metadata())
@@ -47,12 +45,10 @@ pub fn main() {
         .unwrap_or(newest_source - Duration::from_secs(1));
 
     if newest_source > oldest_target {
-        let include = env::var("INCLUDE").unwrap_or("".to_string());
-        let sodium_include = env::var("SODIUM_LIB_DIR")
-                                 .unwrap_or("windows".to_string());
+        let include = env::var("INCLUDE").unwrap_or_else(|_| "".to_string());
+        let sodium_include = env::var("SODIUM_LIB_DIR").unwrap_or_else(|_| "windows".to_string());
 
         let private_bindings = bindgen::Builder::default()
-//            .no_unstable_rust()
             .header("netcode.c")
             .clang_arg("-Ic")
             .clang_arg(format!("-I{}", sodium_include))
@@ -99,7 +95,8 @@ pub fn main() {
             .generate()
             .expect("Unable to generate bindings");
 
-        private_bindings.write_to_file(&private_path)
+        private_bindings
+            .write_to_file(&private_path)
             .expect("Couldn't write bindings!");
     }
 }

@@ -2,39 +2,34 @@
 
 # netcode.io
 
-**netcode.io** is a simple connection-oriented protocol built on top of UDP. 
+**netcode.io** is a connection-oriented protocol built on top of UDP. 
 
-It's designed for client server/games with dedicated servers, like first person shooters and e-sports.
+It's designed for use in client/server games with dedicated servers.
 
-It has the following features:
-
-* Token system so only authenticated clients can connect to your server.
-* Packets sent between clients and server are encrypted and signed.
-
-And it's secure by design:
+It has the following security features:
 
 * Protection against man-in-the-middle attacks.
 * Protection against DDoS amplification attacks.
 * Protection against packet replay attacks.
 * Protection against zombie clients.
 
-Save yourself some time by using netcode.io instead of writing and testing all this yourself!
+netcode.io has been used in several AAA game projects and is stable and mature.
 
 # How does it work?
 
 Please refer to the second half of this whitepaper: [Why can't I send UDP packets from a browser?](http://gafferongames.com/post/why_cant_i_send_udp_packets_from_a_browser/) 
 
-For a complete technical specification, read the [netcode 1.01 standard](https://github.com/networkprotocol/netcode.io/blob/master/STANDARD.md).
+For a complete technical specification, read the [netcode 1.02 standard](https://github.com/networkprotocol/netcode.io/blob/master/STANDARD.md).
 
 # Source Code
 
-This repository holds the reference implementation of netcode.io in C.
+This repository holds the implementation of netcode.io in C.
 
 Other netcode.io repositories include:
 
 * [netcode.io C# implementation](https://github.com/KillaMaaki/Netcode.IO.NET)
 * [netcode.io Golang implementation](https://github.com/wirepair/netcode)
-* [netcode.io Rust implementation](https://github.com/vvanders/netcode.io)
+* [netcode.io Rust implementation](https://github.com/jaynus/netcode.io) (updated fork of [vvanders/netcode.io](https://github.com/vvanders/netcode.io))
 * [netcode.io for Unity](https://github.com/KillaMaaki/Unity-Netcode.IO)
 * [netcode.io for UE4](https://github.com/RedpointGames/netcode.io-UE4)
 * [netcode.io browser plugin](https://github.com/RedpointGames/netcode.io-browser)
@@ -44,23 +39,26 @@ Other netcode.io repositories include:
 These people are awesome:
 
 * [Val Vanders](https://github.com/vvanders) - Rust Implementation
+* [Walter Pearce](https://github.com/jaynus) - Rust Implementation
 * [Isaac Dawson](https://github.com/wirepair) - Golang Implementation
-* [June Rhodes](https://github.com/hach-que) - C# bindings, browser support, UE4 integration.
-* [Alan Stagner](https://github.com/KillaMaaki) - Unity integration, C# implementation.
+* [June Rhodes](https://github.com/hach-que) - C# bindings, browser support, UE4 integration
+* [Alan Stagner](https://github.com/KillaMaaki) - Unity integration, C# implementation
+* [Jérôme Leclercq](https://github.com/DrLynix) - Support for random connect token nonce
+* [Randy Gaul](https://github.com/RandyGaul) - Discovered vulnerability in replay protection
 
 Thanks for your contributions to netcode.io!
 
 # Author
 
-The author of this library is [Glenn Fiedler](https://www.linkedin.com/in/glennfiedler), a recognized expert in the field of game network programming with over 15 years experience in the game industry.
+The author of this library is [Glenn Fiedler](https://www.linkedin.com/in/glennfiedler).
 
 Glenn wrote an article series about the development of this library called [Building a Game Network Protocol](https://gafferongames.com/categories/building-a-game-network-protocol).
 
-Open source libraries by the same author include: [yojimbo](http://libyojimbo.com) and [reliable.io](https://github.com/networkprotocol/reliable.io)
+Other open source libraries by the same author include: [yojimbo](http://libyojimbo.com) and [reliable.io](https://github.com/networkprotocol/reliable.io)
 
 # Sponsors
 
-**netcode.io** is generously sponsored by:
+**netcode.io** was generously sponsored by:
 
 * **Gold Sponsors**
     * [Remedy Entertainment](http://www.remedygames.com/)

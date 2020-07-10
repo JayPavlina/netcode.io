@@ -1,10 +1,10 @@
-use std::net::{SocketAddr, UdpSocket};
 use std::io;
+use std::net::{SocketAddr, UdpSocket};
 use std::time::Duration;
 
 // TODO: fix this
-#[cfg_attr(feature="cargo-clippy", allow(stutter))]
-pub trait SocketProvider<I,S> {
+#[cfg_attr(feature = "cargo-clippy", allow(stutter))]
+pub trait SocketProvider<I, S> {
     fn new_state() -> S;
     fn bind(addr: &SocketAddr, state: &mut S) -> Result<I, io::Error>;
     fn local_addr(&self) -> Result<SocketAddr, io::Error>;
@@ -13,7 +13,7 @@ pub trait SocketProvider<I,S> {
     fn send_to(&mut self, buf: &[u8], addr: &SocketAddr) -> Result<usize, io::Error>;
 }
 
-impl SocketProvider<UdpSocket,()> for UdpSocket {
+impl SocketProvider<UdpSocket, ()> for UdpSocket {
     fn new_state() -> () {
         ()
     }
@@ -34,10 +34,8 @@ impl SocketProvider<UdpSocket,()> for UdpSocket {
             Some(duration) => {
                 self.set_read_timeout(Some(duration))?;
                 self.set_nonblocking(false)
-            },
-            None => {
-                self.set_nonblocking(true)
             }
+            None => self.set_nonblocking(true),
         }
     }
 
@@ -55,15 +53,15 @@ pub mod capi_simulator {
     use super::*;
     use crate::capi::*;
 
-    use std::rc::{Rc, Weak};
     use std::cell::RefCell;
-    use std::ffi::{CString, CStr};
+    use std::ffi::{CStr, CString};
+    use std::rc::{Rc, Weak};
 
     #[allow(unused)]
     pub type SimulatorRef = Rc<RefCell<Simulator>>;
 
     pub struct Simulator {
-        pub sim: *mut netcode_network_simulator_t
+        pub sim: *mut netcode_network_simulator_t,
     }
 
     impl Drop for Simulator {
@@ -77,19 +75,23 @@ pub mod capi_simulator {
     #[allow(unused)]
     pub struct SimulatedSocket {
         local_addr: SocketAddr,
-        sim: Weak<RefCell<Simulator>>
+        sim: Weak<RefCell<Simulator>>,
     }
 
     #[allow(unused)]
     fn addr_to_naddr(addr: &SocketAddr) -> Result<netcode_address_t, io::Error> {
         unsafe {
             let mut naddr: netcode_address_t = ::std::mem::uninitialized();
-            let str_rep = CString::new(format!("{}", addr))
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Invalid string address"))?;
+            let str_rep = CString::new(format!("{}", addr)).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "Invalid string address")
+            })?;
 
             match netcode_parse_address(str_rep.as_ptr(), &mut naddr) {
                 1 => Ok(naddr),
-                _ => Err(io::Error::new(io::ErrorKind::InvalidInput, "Unable to parse addr"))
+                _ => Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Unable to parse addr",
+                )),
             }
         }
     }
@@ -103,22 +105,25 @@ pub mod capi_simulator {
             netcode_address_to_string(::std::mem::transmute(naddr), addr.as_mut_ptr());
 
             let cstr = CStr::from_ptr(addr.as_ptr());
-            SocketAddr::from_str(cstr.to_str().map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Invalid UTF-8"))?)
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to parse address"))
+            SocketAddr::from_str(
+                cstr.to_str()
+                    .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Invalid UTF-8"))?,
+            )
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Unable to parse address"))
         }
     }
 
     impl SocketProvider<SimulatedSocket, SimulatorRef> for SimulatedSocket {
         fn new_state() -> Rc<RefCell<Simulator>> {
             Rc::new(RefCell::new(Simulator {
-                sim: unsafe { netcode_network_simulator_create(std::ptr::null_mut(), None, None) }
+                sim: unsafe { netcode_network_simulator_create(std::ptr::null_mut(), None, None) },
             }))
         }
 
         fn bind(addr: &SocketAddr, state: &mut SimulatorRef) -> Result<SimulatedSocket, io::Error> {
             Ok(SimulatedSocket {
                 local_addr: addr.clone(),
-                sim: Rc::downgrade(state)
+                sim: Rc::downgrade(state),
             })
         }
 
@@ -145,20 +150,25 @@ pub mod capi_simulator {
                             packet.len() as i32,
                             packet.as_mut_ptr(),
                             &mut packet_len,
-                            &mut addr); 
+                            &mut addr,
+                        );
 
                         match result {
                             1 => {
                                 let len = packet_len as usize;
-                                buf[..len].copy_from_slice(::std::slice::from_raw_parts(packet[0], len));
+                                buf[..len]
+                                    .copy_from_slice(::std::slice::from_raw_parts(packet[0], len));
 
                                 free(::std::mem::transmute(packet[0]));
                                 Ok((len as usize, naddr_to_addr(&addr)?))
-                            },
-                            _ => Err(io::Error::new(io::ErrorKind::WouldBlock, "No packets"))
+                            }
+                            _ => Err(io::Error::new(io::ErrorKind::WouldBlock, "No packets")),
                         }
                     }
-                    None => Err(io::Error::new(io::ErrorKind::InvalidData, "Simulator released"))
+                    None => Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Simulator released",
+                    )),
                 }
             }
         }
@@ -175,13 +185,16 @@ pub mod capi_simulator {
                             &mut from,
                             &mut to,
                             ::std::mem::transmute(buf.as_ptr()),
-                            buf.len() as i32); 
+                            buf.len() as i32,
+                        );
                         Ok(buf.len())
                     }
-                    None => Err(io::Error::new(io::ErrorKind::InvalidData, "Simulator released"))
+                    None => Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Simulator released",
+                    )),
                 }
             }
-
         }
     }
 }

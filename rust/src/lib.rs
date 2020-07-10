@@ -135,47 +135,40 @@
 //! let token = server.generate_token(EXPIRE_SECONDS, client_id, None).unwrap();
 //! ```
 
-#![cfg_attr(feature="cargo-clippy", warn(clippy, clippy_correctness, clippy_style, clippy_pedantic, clippy_perf))]
+#![warn(clippy::all)]
 #![feature(nll, stmt_expr_attributes)]
 #![warn(rust_2018_idioms)]
-#![allow(warnings)]
 
 /*
-extern crate libsodium_sys;
-extern crate byteorder;
+
+
 #[cfg(test)]
-extern crate env_logger;
+
 */
 
 #[cfg(test)]
 #[macro_use]
-extern crate lazy_static;
-
 #[macro_use]
-extern crate log;
-
-#[macro_use]
-extern crate err_derive;
-
 #[cfg(test)]
 pub mod capi;
 
-mod common;
-mod error;
-mod crypto;
-mod server;
-mod client;
 mod channel;
-mod replay;
-mod token;
+mod client;
+mod common;
+mod crypto;
+mod error;
 mod packet;
+mod replay;
+mod server;
 mod socket;
+mod token;
 
-pub use crate::token::{ConnectToken, HostList, DecodeError, GenerateError};
-pub use crate::common::{NETCODE_MAX_PACKET_SIZE, NETCODE_MAX_PAYLOAD_SIZE, NETCODE_USER_DATA_BYTES};
-pub use crate::server::{UdpServer, Server, ServerEvent, CreateError as CreateServerError};
-pub use crate::server::connection::Connection;
-pub use crate::client::{UdpClient, Client, ClientEvent, State as ClientState};
-pub use crate::crypto::{generate_key};
+pub use crate::client::{Client, ClientEvent, State as ClientState, UdpClient};
+pub use crate::common::{
+    NETCODE_MAX_PACKET_SIZE, NETCODE_MAX_PAYLOAD_SIZE, NETCODE_USER_DATA_BYTES,
+};
+pub use crate::crypto::generate_key;
 pub use crate::error::*;
+pub use crate::server::{Server, ServerEvent, UdpServer, CreateError as CreateServerError, connection::Connection};
+pub use crate::token::{ConnectToken, HostList, DecodeError, GenerateError};
 pub use crate::packet::Packet;
